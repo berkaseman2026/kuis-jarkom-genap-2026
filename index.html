@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kuis Jaringan Komputer</title>
+<style>
+:root{font-family:Arial,sans-serif;color:#222}*{box-sizing:border-box}body{background:#f5f5f5;text-align:center;padding:20px;margin:0}h1{cursor:pointer;color:#333;font-size:clamp(1.5rem,4vw,2.2rem)}#timer{font-size:16px;color:#8b4513;margin:16px 0;min-height:20px}#question{background:#fff;max-width:1000px;margin:auto;padding:25px;border-radius:10px;box-shadow:0 0 10px #00000026;font-size:clamp(1.1rem,3vw,1.5rem);min-height:120px;overflow-wrap:anywhere}#options{max-width:1000px;margin:20px auto}.option-btn{width:100%;text-align:left;padding:15px;margin:8px 0;font-size:clamp(1rem,2.5vw,1.25rem);border:0;border-radius:8px;background:#ddd;cursor:pointer}.option-btn:hover:not(:disabled){background:#ccc}.option-btn:disabled{cursor:not-allowed;opacity:1}.option-btn.selected{background:#555!important;color:white!important}
+button{padding:12px 25px;margin:5px;border:0;border-radius:8px;font-size:18px;cursor:pointer}button:disabled{background:#ccc!important;color:#666!important;cursor:not-allowed}#simpanBtn,#startBtn{background:#4caf50;color:white}#finishBtn{background:#f44336;color:white}#downloadBtn{background:#2196f3;color:white}#downloadPDFBtn{background:#673ab7;color:white}input{padding:10px;width:min(320px,90vw);font-size:18px;margin:5px;border:1px solid #aaa;border-radius:5px}.info-peserta{line-height:1.5;font-size:clamp(1rem,2.5vw,1.35rem)}.info-peserta p{margin:4px 0}.status{font-size:15px;min-height:22px;color:#444;margin:10px}#pesertaBox{margin:20px auto}footer{color:#666;font-size:13px;margin-top:25px}@media(max-width:600px){body{padding:12px}#question{padding:18px}button{font-size:16px;padding:11px 16px}}
+</style>
+</head>
+<body>
+<h1 ondblclick="adminLogin()" title="Klik dua kali untuk login admin">KUIS JARINGAN KOMPUTER</h1>
+<div id="timer" aria-live="polite">SIAP</div>
+<div id="question" aria-live="polite">Silakan isi identitas peserta terlebih dahulu.</div>
+<div id="options"></div>
+<div id="pesertaBox">
+  <h3>Identitas Peserta</h3>
+  <input type="text" id="namaPeserta" placeholder="Nama Lengkap" autocomplete="name" maxlength="120"><br>
+  <input type="text" id="nimPeserta" placeholder="NIM" maxlength="50"><br>
+  <input type="text" id="kelasPeserta" placeholder="Kelas" maxlength="80"><br>
+  <button id="simpanBtn" onclick="validasiPeserta()">Simpan Identitas</button>
+</div>
+<div>
+  <button id="startBtn" onclick="startQuiz()" disabled>Mulai</button>
+  <button id="finishBtn" onclick="finishQuiz()" disabled>Selesai</button>
+  <button id="downloadBtn" onclick="exportCSV()" disabled>Unduh CSV</button>
+  <button id="downloadPDFBtn" onclick="exportPDF()" disabled>Unduh PDF</button>
+</div>
+<div id="status" class="status" role="status" aria-live="polite"></div>
+<footer>Klik dua kali judul untuk membuka menu admin.</footer>
+<script>
+'use strict';
+
+// CATATAN KEAMANAN: password ini berada di sisi browser dan bukan autentikasi aman.
+// Untuk penggunaan resmi, validasi admin sebaiknya dipindahkan ke server.
+const adminPassword = 'PNUP2026';
+const QUESTION_TIME_SECONDS = 20;
+const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyO0PNuOAzDmlquzRZuRRF-Nc3Xig72LP4JOJk5vmEP54VfxrcfCtEIxzrvHbde_-GPhA/exec';
+
+// Pertahankan soal yang ada di file sumber. Tambahkan soal lain di array ini bila diperlukan.
+const originalQuizData = [
+  {
+
+question:"Pengertian jaringan komputer adalah :",
+options:[
+"Sistem operasi yang digunakan untuk menghubungkan komputer",
+"Protokol komunikasi antar perangkat lunak",
+"Sekelompok komputer yang saling terhubung untuk berbagi data dan sumber daya",
+"Perangkat keras yang digunakan untuk mengakses internet"
+],
+answer:"Sekelompok komputer yang saling terhubung untuk berbagi data dan sumber daya",
+time:15
+},
+
+{
+question:"Jenis topologi yang setiap perangkat terhubung langsung ke semua perangkat lainnya disebut ......",
+options:[
+"Star",
+"Mesh",
+"Ring",
+"Bus"
+],
+answer:"Mesh"
+},
+
+
+{
+    "question": "Jaringan komputer antar benua termasuk dalam kategori ..... . Pilih berikut ini :",
+  options:["LAN ",
+  " MAN ",
+   "WAN ",
+   "CAN "],
+    answer: "WAN"
+  },
+
+
+{
+question:"Berikut ini yang benar dari jenis-jenis topologi fisik, kecuali :",
+options:[
+"Ethernet",
+"Mesh",
+"Star",
+"Bus"
+],
+answer:"Ethernet"
+},
+
+
+{
+question:"Ethernet menggunakan metode akses media ........ Pilih berikut ini :",
+options:[
+"FDMA",
+"CDMA",
+"CSMA/CD",
+"TDMA"
+],
+answer:"CSMA/CD"
+},
+
+{
+question:"Ethernet dengan kabel koaksial tebal dan berdiameter 0,5 inchi disebut... Pilih berikut ini :",
+options:[
+"100 Base Tx",
+"10 Base 5",
+"10 Base T",
+"10 Base 2"
+],
+answer:"10 Base 5"
+},
+
+
+{
+question:"Kabel yang paling tahan terhadap gangguan EMI dan RFI adalah ........ Pilih berikut ini :",
+options:[
+"Koaksial",
+"STP",
+"Fiber Optik",
+"UTP"
+],
+answer:"Fiber Optik"
+},
+
+{
+question:"Ethernet menggunakan metode siaran yang disebut ........ Pilih berikut ini :",
+options:[
+"Polling",
+"Multicast",
+"Broadcast protocol",
+"Token passing"
+],
+answer:"Broadcast protocol"
+},
+
+{
+question:"Berikut ini yang benar dari Media komunikasi adalah sebagai berikut :",
+options:[
+"10Base2, Bus, BNC, Koaksial, 500m",
+"Koaksial, BNC, Bus, 10Base5, 1000m",
+"100m, Star, RJ45, 10Base5, UTP",
+"Star, UTP, RJ45, 100m, 10BaseT"
+],
+answer:"Star, UTP, RJ45, 100m, 10BaseT",
+time:20
+},
+
+
+{
+question:"Berikut ini susunan kabel yang benar yang biasa digunakan adalah:",
+options:[
+"orange putih, orange, hijau putih, biru, biru putih, hijau, coklat putih, coklat",
+"orange putih, orange, hijau putih, biru, biru putih, coklat, coklat putih, hijau",
+"orange putih, orange, hijau putih, hijau, biru putih, biru, coklat putih, coklat",
+"putih orange, orange, putih hijau, hijau, putih biru, biru, putih coklat, coklat"
+],
+answer:"orange putih, orange, hijau putih, biru, biru putih, hijau, coklat putih, coklat",
+time:25
+},
+
+{
+question:"Lapisan kedua dalam model OSI adalah ........ Pilih berikut ini :",
+options:[
+"Application layer",
+"Network layer",
+"Physical layer",
+"Data link layer"
+],
+answer:"Data link layer"
+},
+
+
+
+{
+question:"Lapisan OSI yang bertanggung jawab atas transmisi bit antar perangkat adalah ........ Pilih berikut ini :",
+options:[
+"Transport layer",
+"Physical layer",
+"Network layer",
+"Data link layer"
+],
+answer:"Physical layer"
+},
+
+
+{
+question:"Sebuah komputer dalam jaringan diberikan IP Address secara otomatis oleh server. Protokol apa yang digunakan?",
+options:[
+"FTP",
+"DNS",
+"DHCP",
+"HTTP"
+],
+answer:"DHCP"
+},
+
+
+
+{
+question:"Setiap komputer yang terhubung ke jaringan dapat bertindak baik sebagai workstation maupun server merupakan pengertian dari...",
+options:[
+"client-server",
+"workstation",
+"Server",
+"peer-to-peer"
+],
+answer:"peer-to-peer"
+},
+
+
+
+{
+question:"Protokol yang digunakan untuk mentransfer file antar komputer adalah?",
+options:[
+"IP",
+"TCP",
+"FTP",
+"ARP"
+],
+answer:"FTP"
+},
+
+{
+question:"Alamat IP 127.0.0.1 digunakan untuk?",
+options:[
+"Loopback",
+"Gateway",
+"Broadcast",
+"Multicast"
+],
+answer:"Loopback"
+},
+
+
+{
+question:"Protokol yang digunakan untuk mengirim email adalah?",
+options:[
+"FTP",
+"SMTP",
+"TCP",
+"IP"
+],
+answer:"SMTP"
+},
+
+{
+question:"Berikut ini protokol dan kepanjangannya. Kecuali....",
+options:[
+"RARP : Reverse Address Resolution Protocol",
+"FTP  : File Transformation Protocol",
+"SNMP : Simple Network Management Protocol",
+"DHCP : Dynamic Host Configuration Protocol"
+],
+answer:"FTP  : File Transformation Protocol",
+time:20
+},
+
+
+ 
+   
+    {
+    "question": "Standar LAN dengan kecepatan 100 Mbps berikut ini adalah:",
+    options:[
+    "IEEE 802.3u",
+    "IEEE 802.3z",
+    "IEEE 802.3",   
+    "IEEE 802.11",
+    ], 
+    "answer": "IEEE 802.3u"
+
+    },
+
+    {
+    question:"Protokol yang mentranslasi IP Address ke nama domain atau sebaliknya adalah :",
+    options:[
+    "FTP",
+    "DNS",
+    "DHCP",
+    "SMTP"
+    ],
+    answer:"DNS"
+    },
+    
+    {
+    question:"Berikut ini yang benar dari IP Address, Netmask, dan Kelas Address, kecuali :",
+    options:[
+    "165.16.1.1, 255.255.0.0, Kelas B",
+    "198.168.10.1  255.255.255.0, Kelas C",
+    "10.10.1.1, 255.0.0.0, Kelas A",
+    "135.168.1.1, 255.255.255.0, Kelas B"
+    ],
+    answer:"135.168.1.1, 255.255.255.0, Kelas B",
+    time:20
+    },
+
+    {
+    question:"Sebuah jaringan mempunyai netID : 153.135.0.0 dengan netmask : 255.255.240.0. Berapa jumlah subnet yang terbentuk? (Rumus : 2^x - 2)",
+    options:[
+    "32",
+    "14",
+    "16",
+    "4"
+    ],
+    answer:"14",
+    time:25
+    },
+
+    {
+    question:"Sebuah jaringan mempunyai netID : 153.135.0.0 dengan netmask : 255.255.240.0. Berapa jumlah host per subnet yang terbentuk? (Rumus : 2^y - 2)",
+    options:[
+    "8194",
+    "14",
+    "4094",
+    "16"
+    ],
+    answer:"4094",
+     time:25
+    },
+
+    {
+    question:"Berikut ini Subnet Address yang terbentuk yang benar dari jaringan yang mempunyai netID 201.162.32.0 dengan netmask 255.255.255.224 adalah, kecuali:",
+    options:[
+    "201.162.32.96",
+    "201.162.32.48",
+    "201.162.32.64",
+    "201.162.32.128"
+    ],
+    answer:"201.162.32.48",
+     time:25
+    },
+
+    {
+    question:"Berikut ini Range IP Address yang dapat digunakan dari jaringan yang mempunyai netID 201.162.32.0 dengan netmask 255.255.255.224 adalah, kecuali:",
+    options:[
+    "201.126.32.1 - 201.126.32.30",
+    "201.126.32.33 - 201.126.32.62",
+    "201.126.32.32 - 201.126.32.63",
+    "201.126.32.65 - 201.126.32.94"
+    ],
+    answer:"201.126.32.32 - 201.126.32.63",
+    time:25
+    },
+
+
+
+];
+
+let quizData = [];
+let currentQuestion = 0;
+let score = 0;
+let timer = null;
+let timeLeft = QUESTION_TIME_SECONDS;
+//let timeLeft = q.time || 20;
+
+let answered = false;
+let quizStarted = false;
+let quizFinished = false;
+let identitySaved = false;
+let namaPeserta = '';
+let nimPeserta = '';
+let kelasPeserta = '';
+let pelanggaran = 0;
+const MAX_PELANGGARAN = 3;
+
+
+const questionDiv = document.getElementById('question');
+const optionsDiv = document.getElementById('options');
+const timerDiv = document.getElementById('timer');
+const statusDiv = document.getElementById('status');
+const startBtn = document.getElementById('startBtn');
+const finishBtn = document.getElementById('finishBtn');
+const downloadBtn = document.getElementById('downloadBtn');
+const downloadPDFBtn = document.getElementById('downloadPDFBtn');
+
+function setStatus(message) { statusDiv.textContent = message || ''; }
+function shuffleArray(array) {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+}
+function escapeHTML(value) {
+  return String(value).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function validasiPeserta() {
+  if (quizStarted || quizFinished) return;
+  const nama = document.getElementById('namaPeserta').value.trim();
+  const nim = document.getElementById('nimPeserta').value.trim();
+  const kelas = document.getElementById('kelasPeserta').value.trim();
+  if (!nama || !nim || !kelas) {
+    alert('Nama, NIM, dan kelas wajib diisi.');
+    return;
+  }
+  namaPeserta = nama; nimPeserta = nim; kelasPeserta = kelas;
+  identitySaved = true;
+  document.getElementById('namaPeserta').disabled = true;
+  document.getElementById('nimPeserta').disabled = true;
+  document.getElementById('kelasPeserta').disabled = true;
+  document.getElementById('simpanBtn').disabled = true;
+  document.getElementById('pesertaBox').style.display = 'none';
+  startBtn.disabled = false;
+  questionDiv.innerHTML = `<h3 style="color:green">✓ Identitas peserta berhasil disimpan</h3><div class="info-peserta"><p><b>Nama:</b> ${escapeHTML(namaPeserta)}</p><p><b>NIM:</b> ${escapeHTML(nimPeserta)}</p><p><b>Kelas:</b> ${escapeHTML(kelasPeserta)}</p></div><p><b>Silakan tekan tombol MULAI.</b></p>`;
+  setStatus('Identitas tersimpan pada sesi browser ini.');
+}
+function loadQuestion() {
+  if (currentQuestion >= quizData.length) { showAllQuestionsDone(); return; }
+  answered = false;
+  const q = quizData[currentQuestion];
+  questionDiv.innerHTML = `<b>Soal ${currentQuestion + 1} dari ${quizData.length}</b><br><br>${escapeHTML(q.question)}`;
+  optionsDiv.replaceChildren();
+  q.options.forEach((option, index) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'option-btn';
+    btn.textContent = `${String.fromCharCode(65 + index)}. ${option}`;
+    btn.addEventListener('click', () => checkAnswer(btn, option));
+    optionsDiv.appendChild(btn);
+  });
+  //timeLeft = QUESTION_TIME_SECONDS;
+  timeLeft = q.time || 20;
+  updateTimerDisplay();
+}
+function updateTimerDisplay() { timerDiv.textContent = `Waktu: ${timeLeft} detik`; }
+function stopTimer() { if (timer !== null) { clearInterval(timer); timer = null; } }
+function disableCurrentOptions() { optionsDiv.querySelectorAll('.option-btn').forEach(btn => { btn.disabled = true; }); }
+function checkAnswer(button, selected) {
+  if (!quizStarted || answered || quizFinished) return;
+  answered = true;
+  stopTimer();
+ 
+  const correctAnswer = quizData[currentQuestion].answer;
+  if (selected === correctAnswer) {score++;}
+
+  disableCurrentOptions();
+  button.classList.add('selected');
+  
+  //=== correctAnswer ? 'correct' : 'incorrect');
+ // if (selected !== correctAnswer) {
+   // optionsDiv.querySelectorAll('.option-btn').forEach(btn => {
+ //     if (btn.textContent.slice(3) === correctAnswer) btn.classList.add('correct');
+ //   });""
+ // }
+//
+
+  window.setTimeout(() => {
+    advanceQuestion();
+  }, 700);
+}
+function startQuestionTimer() {
+  stopTimer();
+  updateTimerDisplay();
+  timer = window.setInterval(() => {
+    if (!quizStarted || answered) { stopTimer(); return; }
+    timeLeft--;
+    updateTimerDisplay();
+    if (timeLeft <= 0) {
+      answered = true;
+      stopTimer();
+      disableCurrentOptions();
+      timerDiv.textContent = 'Waktu habis';
+      setStatus('Waktu untuk soal ini habis; jawaban dihitung salah.');
+      window.setTimeout(advanceQuestion, 400);
+    }
+  }, 1000);
+}
+
+function advanceQuestion() {
+  if (!quizStarted || quizFinished) return;
+  currentQuestion++;
+  if (currentQuestion >= quizData.length) { showAllQuestionsDone(); return; }
+  loadQuestion();
+  startQuestionTimer();
+}
+function showAllQuestionsDone() {
+  stopTimer();
+  quizStarted = false;
+  timerDiv.textContent = 'SEMUA SOAL TELAH DIPROSES';
+  questionDiv.innerHTML = '<h3>Semua soal telah selesai.</h3><p>Silakan klik tombol SELESAI untuk menyimpan hasil.</p>';
+  optionsDiv.replaceChildren();
+  finishBtn.disabled = false;
+}
+
+function masukFullscreen() {
+
+  const elem = document.documentElement;
+
+  if (elem.requestFullscreen) {
+    elem.requestFullscreen();
+  } else if (elem.webkitRequestFullscreen) {
+    elem.webkitRequestFullscreen();
+  } else if (elem.msRequestFullscreen) {
+    elem.msRequestFullscreen();
+  }
+
+}
+
+function tambahPelanggaran(alasan) {
+  if (!quizStarted || quizFinished) return;
+
+  pelanggaran++;
+  console.log("Jumlah pelanggaran:", pelanggaran);
+  
+  let pesan = "Pelanggaran: " + pelanggaran + " (" + alasan + ")";
+  
+  // Jika pelanggaran lebih dari 3, berikan peringatan pengurangan nilai
+  if (pelanggaran > 3) {
+    let pengurangan = (pelanggaran - 3) * 5;
+    pesan += "\n\n⚠️ PERINGATAN: Nilai akhir Anda akan dikurangi " + pengurangan + " poin!";
+  }
+
+  setStatus(pesan.replace(/\n/g, ' '));
+  alert("Pelanggaran terdeteksi!\n\n" + alasan + "\n\n" + pesan);
+  beep();
+}
+
+
+async function autoFinishQuiz(alasan){
+
+  stopTimer();
+
+  quizStarted = false;
+  quizFinished = true;
+
+  startBtn.disabled = true;
+  finishBtn.disabled = true;
+
+  downloadBtn.disabled = false;
+  downloadPDFBtn.disabled = false;
+
+  timerDiv.textContent =
+    "UJIAN DIHENTIKAN";
+
+  optionsDiv.replaceChildren();
+
+  const nilaiAkhir = getFinalScore();
+
+  questionDiv.innerHTML =
+    `
+    <h2 style="color:red">
+      Ujian Dihentikan
+    </h2>
+
+    <p>${alasan}</p>
+
+    <p><b>Nama:</b> ${escapeHTML(namaPeserta)}</p>
+
+    <p><b>NIM:</b> ${escapeHTML(nimPeserta)}</p>
+
+    <p><b>Kelas:</b> ${escapeHTML(kelasPeserta)}</p>
+
+    <h3>
+      Jawaban Benar :
+      ${score}
+      dari
+      ${quizData.length}
+    </h3>
+
+    <h1 style="color:red">
+      Nilai : ${nilaiAkhir}
+    </h1>
+    `;
+
+  setStatus(
+    "Ujian dihentikan otomatis karena pelanggaran."
+  );
+
+  await kirimKeGoogleSheet();
+}
+
+
+
+function startQuiz() {
+  if (quizStarted || quizFinished || !identitySaved) return;
+  quizStarted = true;
+
+  pelanggaran = 0;
+  masukFullscreen();
+
+  score = 0;
+  currentQuestion = 0;
+  timeLeft = QUESTION_TIME_SECONDS;
+  quizData = originalQuizData.map(q => ({...q, options: [...q.options]}));
+  shuffleArray(quizData);
+  quizData.forEach(q => shuffleArray(q.options));
+  startBtn.disabled = true;
+  finishBtn.disabled = true;
+  downloadBtn.disabled = true;
+  downloadPDFBtn.disabled = true;
+  setStatus('Kuis sedang berlangsung.');
+  loadQuestion();
+  startQuestionTimer();
+}
+
+
+function getFinalScore() {
+  // Hitung nilai dasar dari jawaban benar
+  let baseScore = quizData.length ? Math.round((score / quizData.length) * 100) : 0;
+  let penalty = 0;
+  
+  // Jika pelanggaran lebih dari 3, kurangi 5 poin untuk setiap pelanggaran tambahan
+  if (pelanggaran > 3) {
+    penalty = (pelanggaran - 3) * 5;
+  }
+  
+  // Pastikan nilai akhir tidak kurang dari 0
+  let finalScore = Math.max(0, baseScore - penalty);
+  
+  console.log("Nilai Dasar:", baseScore, "| Pengurangan:", penalty, "| Nilai Akhir:", finalScore);
+  return finalScore;
+}
+
+
+
+async function kirimKeGoogleSheet() {
+  const data = {
+    nama: namaPeserta,
+    nim: nimPeserta,
+    kelas: kelasPeserta,
+    benar: score,
+    total: quizData.length,
+    nilai: getFinalScore(),
+    // HAPUS: waktu: new Date().toLocaleString("id-ID"),
+    pelanggaran: pelanggaran
+  };
+
+  console.log("Mengirim data:", data);
+
+  try {
+    const response = await fetch(GOOGLE_SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: {
+        "Content-Type": "text/plain;charset=utf-8"
+      },
+      body: JSON.stringify(data)
+    });
+
+    console.log("Response status:", response.status);
+    return { ok: true, message: "Data berhasil dikirim ke Google Spreadsheet." };
+
+  } catch (error) {
+    console.error("Fetch error:", error);
+    return { ok: false, message: "Gagal mengirim data. Error: " + error.message };
+  }
+}
+
+
+
+function csvEscape(value) { return `"${String(value ?? '').replace(/"/g, '""')}"`; }
+function exportCSV() {
+  if (!quizFinished) return;
+  const rows = [
+    ['Nama','NIM','Kelas','JawabanBenar','TotalSoal','Nilai'],
+    [namaPeserta,nimPeserta,kelasPeserta,score,quizData.length,getFinalScore()]
+  ];
+  const csvContent = '\uFEFF' + rows.map(row => row.map(csvEscape).join(',')).join('\r\n');
+  const blob = new Blob([csvContent], {type:'text/csv;charset=utf-8;'});
+  downloadBlob(blob, `${safeFilename(nimPeserta)}_${safeFilename(namaPeserta)}.csv`);
+}
+function safeFilename(value) { return String(value || 'hasil').replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_').trim() || 'hasil'; }
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url; link.download = filename;
+  document.body.appendChild(link); link.click(); link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function exportPDF() {
+  if (!quizFinished) return;
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    alert('Pustaka PDF belum tersedia. Periksa koneksi internet lalu muat ulang halaman.');
+    return;
+  }
+  const {jsPDF} = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(16); doc.text('HASIL KUIS JARINGAN KOMPUTER', 20, 20);
+  doc.setFontSize(12);
+  doc.text(doc.splitTextToSize(`Nama: ${namaPeserta}`, 170), 20, 40);
+  doc.text(doc.splitTextToSize(`NIM: ${nimPeserta}`, 170), 20, 50);
+  doc.text(doc.splitTextToSize(`Kelas: ${kelasPeserta}`, 170), 20, 60);
+  doc.text(`Jawaban benar: ${score} dari ${quizData.length} soal`, 20, 80);
+  doc.text(`Nilai akhir: ${getFinalScore()}`, 20, 95);
+  doc.save(`${safeFilename(nimPeserta)}_${safeFilename(namaPeserta)}.pdf`);
+}
+async function finishQuiz() {
+  if (quizFinished || quizStarted || !quizData.length || currentQuestion < quizData.length) return;
+  stopTimer();
+  quizFinished = true;
+  finishBtn.disabled = true;
+  startBtn.disabled = true;
+  downloadBtn.disabled = false;
+  downloadPDFBtn.disabled = false;
+  optionsDiv.replaceChildren();
+  timerDiv.textContent = 'KUIS SELESAI';
+  const nilaiAkhir = getFinalScore();
+  questionDiv.innerHTML = `<h2>Terima Kasih</h2><p><b>Nama:</b> ${escapeHTML(namaPeserta)}</p><p><b>NIM:</b> ${escapeHTML(nimPeserta)}</p><p><b>Kelas:</b> ${escapeHTML(kelasPeserta)}</p><h3>Jawaban benar: ${score} dari ${quizData.length} soal</h3><h1 style="color:blue">Nilai: ${nilaiAkhir}</h1><hr><p>Kuis telah selesai.</p>`;
+  beep();
+  setStatus('Mengirim hasil ke Google Sheets...');
+  const result = await kirimKeGoogleSheet();
+  setStatus(result.message);
+  if (!result.ok) console.warn('Status pengiriman:', result.message);
+}
+function beep() {
+  try {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    const audioContext = new AudioContextClass();
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    oscillator.frequency.value = 1500;
+    gain.gain.value = 0.08;
+    oscillator.connect(gain); gain.connect(audioContext.destination);
+    oscillator.start(); oscillator.stop(audioContext.currentTime + 0.25);
+    oscillator.onended = () => audioContext.close();
+  } catch (error) { console.warn('Audio tidak dapat diputar:', error); }
+}
+
+function resetForNextParticipant() {
+  stopTimer();
+  quizData = []; 
+  currentQuestion = 0; 
+  score = 0; 
+  timeLeft = QUESTION_TIME_SECONDS;
+  answered = false; 
+  quizStarted = false; 
+  quizFinished = false; 
+  identitySaved = false;
+  namaPeserta = ''; 
+  nimPeserta = ''; 
+  kelasPeserta = '';
+  pelanggaran = 0; // <-- PENTING: Reset pelanggaran ke 0
+  
+  ['namaPeserta','nimPeserta','kelasPeserta'].forEach(id => {
+    const el = document.getElementById(id); 
+    el.value = ''; 
+    el.disabled = false;
+  });
+  
+  document.getElementById('pesertaBox').style.display = 'block';
+  document.getElementById('simpanBtn').disabled = false;
+  startBtn.disabled = true; 
+  finishBtn.disabled = true;
+  downloadBtn.disabled = true; 
+  downloadPDFBtn.disabled = true;
+  optionsDiv.replaceChildren();
+  questionDiv.textContent = 'Silakan isi identitas peserta berikutnya.';
+  timerDiv.textContent = 'SIAP';
+  setStatus('Sesi sebelumnya telah direset.');
+}
+
+
+
+function adminLogin() {
+  const password = prompt('Masukkan password admin');
+  if (password === null) return;
+  if (password === adminPassword) {
+    resetForNextParticipant();
+    alert('Login admin berhasil. Identitas peserta baru dapat diisi.');
+  } else {
+    alert('Password salah.');
+  }
+}
+
+
+document.addEventListener(
+  "visibilitychange",
+  function(){
+
+    if(document.hidden){
+
+      tambahPelanggaran(
+        "Berpindah tab/browser"
+      );
+
+    }
+beep();
+  }
+);
+
+document.addEventListener(
+  "fullscreenchange",
+  function(){
+
+    if(
+      quizStarted &&
+      !document.fullscreenElement
+    ){
+
+      tambahPelanggaran(
+        "Keluar dari fullscreen"
+        
+      );
+
+    }
+beep();
+  }
+);
+
+//window.addEventListener(
+//  "blur",
+//  function(){
+
+//    if(quizStarted){
+
+//      tambahPelanggaran(
+//        "Browser kehilangan fokus"
+//      );
+
+//    }
+
+//  }
+//);
+
+
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
+</body>
+</html>
